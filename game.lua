@@ -31,6 +31,9 @@ function Game:draw()
 	end
 
 	self:draw_debug()
+
+	local mx, my = love.mouse.getPosition()
+	love.graphics.circle("fill", mx, my, 10)
 end
 
 function Game:new_actor(actor)

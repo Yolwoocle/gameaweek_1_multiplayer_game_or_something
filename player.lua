@@ -44,7 +44,7 @@ function Player:update(dt)
 	self.mid_x = self.x + floor(self.w/2)
 	self.mid_y = self.y + floor(self.h/2)
 	
-	--self:shoot(dt)
+	self:shoot(dt)
 end
 
 function Player:draw()
