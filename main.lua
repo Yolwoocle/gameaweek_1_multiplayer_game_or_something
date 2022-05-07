@@ -24,8 +24,7 @@ function love.load(arg)
 	local font_regular = love.graphics.newFont("fonts/Poppins-Regular.ttf", 24)
 	love.graphics.setFont(font_regular)
 	
-	game = Game:new(is_server)
-
+	game = Game:new()
 end
 
 t = 0
@@ -51,7 +50,7 @@ function love.draw()
 	game:draw()
 end
 
-function love.keypressed(key)
+function love.keypressed(key, scancode, isrepeat)
 	if key == "f5" then
 		if love.keyboard.isDown("lshift") then
 			love.event.quit("restart")
@@ -67,7 +66,11 @@ function love.keypressed(key)
 		love.window.setFullscreen(is_fullscreen)
 	end
 
-	if game.keypressed then  game:keypressed(key)  end
+	if game.keypressed then  game:keypressed(key, scancode, isrepeat)  end
+end
+
+function love.keyreleased(key, scancode)
+	if game.keyreleased then  game:keyreleased(key, scancode)  end
 end
 
 function love.mousepressed(x, y, button, istouch, presses)

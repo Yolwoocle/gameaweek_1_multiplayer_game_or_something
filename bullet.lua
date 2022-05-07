@@ -3,23 +3,35 @@ local Actor = require "actor"
 
 local Bullet = Actor:inherit()
 
-function Bullet:init(x,y, dir)
-	self:init_actor(x,y)
+function Bullet:init(x, y, vx, vy)
+	self:init_actor(x, y, 32, 16)
+	self.is_bullet = true
+
+	self.friction_x = 1
+	self.friction_y = 1
+	self.gravity = 0
+
 	self.speed = 300
 	self.dir = dir
-	self.dx = math.cos(dir) * self.speed
-	self.dy = math.sin(dir) * self.speed
+	
+	self.vx = vx or 0
+	self.vy = vy or 0
+
+	self.damage = 2
 end
 
 function Bullet:update(dt)
-	self.x = self.x + self.dx * dt
-	self.y = self.y + self.dy * dt
+	self:apply_movement(dt)
 end
 
 function Bullet:draw()
-	love.graphics.setColor(1,1,0)
-	love.graphics.rectangle("fill", self.x, self.y, 32, 32)
-	love.graphics.setColor(1,1,1)
+	rect_color(COL_YELLOW, "fill", self.x, self.y, self.w, self.h)
+end
+
+function Bullet:on_collision(col)
+	if not self.is_removed and col.other.is_solid then
+		self:remove()
+	end
 end
 
 return Bullet

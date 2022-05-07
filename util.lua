@@ -1,5 +1,7 @@
 local utf8 = require "utf8"
 
+max = math.max
+min = math.min
 floor = math.floor
 ceil = math.ceil
 cos = math.cos
@@ -8,6 +10,14 @@ tan = math.tan
 atan2 = math.atan2
 
 gfx = love.graphics
+
+function copy_table(tab)
+	local newtab = {}
+	for k,v in pairs(tab) do
+		newtab[k] = v
+	end
+	return newtab
+end
 
 function is_between(v, a, b)
 	return a <= v and v <= b

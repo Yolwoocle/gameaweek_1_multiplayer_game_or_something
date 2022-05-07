@@ -42,8 +42,8 @@ function Collision.filter(item, other)
 	local type = "cross"
 
 	if other.is_solid then
-	end
 		type = "slide"
+	end
 
 	return type
 end

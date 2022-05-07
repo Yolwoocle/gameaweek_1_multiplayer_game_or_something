@@ -1,6 +1,7 @@
 local Class = require "class"
 local Collision = require "collision"
 local Player = require "player"
+local Enemy = require "enemy"
 local Bullet = require "bullet"
 local TileMap = require "tilemap"
 
@@ -15,12 +16,21 @@ function Game:init()
 
 	self.actors = {}
 	self:init_players()
+	self:new_actor(Enemy:new(64,64))
 end
 
 function Game:update(dt)
 	self.map:update(dt)
 	for k,actor in pairs(self.actors) do
 		actor:update(dt)
+	end
+
+	-- Delete actors
+	for i = #self.actors, 1, -1 do
+		local actor = self.actors[i]
+		if actor.is_removed then
+			table.remove(self.actors, i)
+		end
 	end
 end
 
@@ -31,9 +41,6 @@ function Game:draw()
 	end
 
 	self:draw_debug()
-
-	local mx, my = love.mouse.getPosition()
-	love.graphics.circle("fill", mx, my, 10)
 end
 
 function Game:new_actor(actor)
@@ -59,9 +66,9 @@ function Game:init_players()
 		left = {"a"},
 		right = {"d"},
 		up = {"w"},
-		fire = {"lshift", "a", "e", "f"},
+		fire = {"c", "v", "f"},
 	})
-	self.players[2] = Player:new(1, 256, 128, {
+	self.players[2] = Player:new(2, 256, 128, {
 		type = "keyboard",
 		left = {"left"},
 		right = {"right"},
@@ -71,6 +78,18 @@ function Game:init_players()
 	
 	for _, ply in pairs(self.players) do
 		self:new_actor(ply)
+	end
+end
+
+function Game:keypressed(key, scancode, isrepeat)
+	for i, ply in pairs(self.players) do
+		--ply:keypressed(key, scancode, isrepeat)
+	end
+end
+
+function Game:keyreleased(key, scancode)
+	for i, ply in pairs(self.players) do
+		--ply:keyreleased(key, scancode)
 	end
 end
 
