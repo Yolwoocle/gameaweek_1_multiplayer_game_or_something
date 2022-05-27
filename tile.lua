@@ -4,7 +4,12 @@ require "util"
 
 local Tile = Class:inherit()
 
-function Tile:init(x,y,w)
+function Tile:init_tile(x, y, w, spr)
+	self.type = "tile"
+	self.name = "tile"
+
+	self.mine_time = 0
+
 	self.ix = x
 	self.iy = y
 	self.x = x * w
@@ -12,6 +17,7 @@ function Tile:init(x,y,w)
 	self.w = w
 	self.h = w
 	self.is_solid = false
+	self.sprite = spr
 end
 
 function Tile:update(dt)
@@ -19,17 +25,9 @@ function Tile:update(dt)
 end
 
 function Tile:draw()
-	if self.is_solid then
-		love.graphics.setColor(rgb(255,255,255))
-	else
-		if (self.ix+self.iy)%2 == 0 then
-			love.graphics.setColor(rgb(0,0,0))
-		else
-			love.graphics.setColor(rgb(20,20,20))
-		end
+	if self.sprite then
+		gfx.draw(self.sprite, self.x, self.y)
 	end
-
-	love.graphics.rectangle("fill",self.x, self.y, self.w,self.w)
 end
 
 return Tile

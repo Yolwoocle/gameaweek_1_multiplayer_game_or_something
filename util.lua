@@ -8,6 +8,7 @@ cos = math.cos
 sin = math.sin
 tan = math.tan
 atan2 = math.atan2
+sqrt = math.sqrt
 
 gfx = love.graphics
 
@@ -88,7 +89,7 @@ end
 
 function concatsep(tab, sep)
 	sep = sep or " "
-	local s = tab[1]
+	local s = tostring(tab[1])
 	for i=2,#tab do
 		s = s..sep..tostring(tab[i])
 	end
@@ -247,9 +248,31 @@ function exec_color(col, func, ...)
 	love.graphics.setColor(1,1,1,1)
 end
 
-function rect_color(col, ...)
+function rect_color(col, mode, x, y, w, h, ...)
 	col = col or {1,1,1,1}
 	love.graphics.setColor(col)
-	love.graphics.rectangle(...)
+	love.graphics.rectangle(mode, floor(x)+0.5, floor(y)+0.5, floor(w), floor(h), ...)
 	love.graphics.setColor(1,1,1,1)
+end
+
+function noise(...)
+	local v = love.math.noise(...)
+	return v*2 - 1
+end
+
+function noise01(...)
+	local v = love.math.noise(...)
+	return v
+end
+
+function sqr(a)
+	return a*a
+end
+
+function distsqr(ax, ay, bx, by)
+	return sqr(bx - ax) + sqr(by - ay)
+end
+
+function dist(...)
+	return sqrt(distsqr(...))
 end

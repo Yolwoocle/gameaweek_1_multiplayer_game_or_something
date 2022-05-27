@@ -27,7 +27,14 @@ function Collision:remove(o)
 	self.world:remove(o)
 end
 
-function Collision:move(o, goal_x, goal_y, type_coll, filter)
+function Collision:update(o,x,y,w,h)
+	if not x then
+		x, y, w, h = o.x, o.y, o.w, o.h
+	end
+	self.world:update(o,x,y,w,h)
+end
+
+function Collision:move(o, goal_x, goal_y, filter)
 	-- Attempts to move object `o` and returns data about the collision
 	filter = filter or self.filter
 	goal_x = goal_x

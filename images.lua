@@ -1,3 +1,6 @@
+local Class = require "class"
+require "util"
+
 function load_image(name)
 	local im = love.graphics.newImage("images/"..name)
 	im:setFilter("nearest", "nearest")
@@ -16,5 +19,8 @@ end
 
 local images = {}
 images.magnet = load_image("magnet.png")
+images.ant = load_image("ant1.png")
+images.grass = load_image("grass.png")
+images.dirt = load_image("dirt.png")
 
 return images
