@@ -7,7 +7,10 @@ local Tile = Class:inherit()
 function Tile:init_tile(x, y, w, spr)
 	self.type = "tile"
 	self.name = "tile"
+	self.drop = self
 
+	self.is_targetable = true
+	self.is_breakable = true
 	self.mine_time = 0
 
 	self.ix = x

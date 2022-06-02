@@ -6,8 +6,14 @@ local WorldGenerator = Class:inherit()
 function WorldGenerator:init(map, seed)
 	self.map = map
 	self.seed = seed or love.math.random(-999999, 999999)
+	self.rng = love.math.newRandomGenerator(self.seed)
 	self.noise_scale = 7
 	self.scale_y = 3
+
+	self.vegetation_ids = {
+		{0, 5}, -- Id, Weight
+		{3, 1}, -- mush
+	}
 end
 
 function WorldGenerator:generate(seed)
@@ -26,6 +32,7 @@ function WorldGenerator:generate(seed)
 	self:make_box()
 
 	-- Generate cave
+	-- [[
 	map:for_all_tiles(function(tile, x, y)
 		local s = 7
 		local n = noise01(seed, x/s, y/s) 
@@ -35,6 +42,7 @@ function WorldGenerator:generate(seed)
 			map:set_tile(x, y, 2)
 		end
 	end)
+	--]]
 
 	-- Grassify
 	self:grassify()
@@ -59,11 +67,19 @@ function WorldGenerator:grassify()
 
 	map:for_all_tiles(function(tile, x, y)
 		if y == 0 then    return    end
+		if y-1 < 0 then    return    end
 
 		if tile.name == "dirt" and map:get_tile(x, y-1).name == "air" then
 			map:set_tile(x, y, 1)
+			self:set_vegetation(x, y-1)
 		end
 	end)
+end
+
+function WorldGenerator:set_vegetation(x, y)
+	local vegetal_id = random_weighted(self.vegetation_ids, self.rng)
+	-- print("VEGETAL", vegetal_id)
+	self.map:set_tile(x, y, vegetal_id)
 end
 
 function WorldGenerator:draw()
@@ -71,7 +87,5 @@ function WorldGenerator:draw()
 		gfx.draw(self.canvas, 0,0)
 	end
 end
-
-
 
 return WorldGenerator

@@ -20,6 +20,8 @@ function Tiles:init()
 		self.id = 0
 		
 		self.name = "air"
+		self.is_targetable = false
+		self.is_breakable = false
 		self.sprite = nil
 	end)
 
@@ -31,6 +33,7 @@ function Tiles:init()
 		self.sprite = images.grass
 		
 		self.is_solid = true
+		self.is_breakable = true
 		self.mine_time = .5
 	end)
 
@@ -42,7 +45,20 @@ function Tiles:init()
 		self.name = "dirt"
 		self.sprite = images.dirt
 		self.is_solid = true
+		self.is_breakable = true
 		self.mine_time = .5
+	end)
+
+	-- Dirt
+	self.tiles[3] = make_tile(function(self, x, y, w)
+		self:init_tile(x, y, w)
+		self.id = 3
+
+		self.name = "mushroom"
+		self.sprite = images.mushroom
+		self.is_solid = false
+		self.is_breakable = true
+		self.mine_time = .2
 	end)
 end
 

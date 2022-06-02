@@ -1,6 +1,22 @@
 -- This file is for functions, classes that are unused but I figure
 -- I might have an use for later on. 
 
+-- Offset x and y
+	-- This is a fucking mess please gosh help me get out of this pile of convoluted hell
+	local mid_x = self.x + self.w/2
+	local mid_y = self.y + self.h/2
+	local offset_x = self.x + spr_w2 - self.spr_ox
+	local offset_y = self.y + spr_h2 - self.spr_oy
+
+	local o_ang = atan2(offset_y - mid_y, offset_x - mid_x) + rot
+	local o_rad = dist(offset_x - mid_x, offset_y - mid_y)
+	local ox, oy = cos(o_ang)*o_rad, sin(o_ang)*o_rad
+
+	local x = self.x + ox
+	local y = self.y + oy
+
+
+
 -- Terraria-like world generation
 for ix=0, map_w-1 do
 	-- Big hill general shape

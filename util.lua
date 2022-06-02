@@ -1,5 +1,6 @@
 local utf8 = require "utf8"
 
+abs = math.abs
 max = math.max
 min = math.min
 floor = math.floor
@@ -12,6 +13,16 @@ sqrt = math.sqrt
 
 gfx = love.graphics
 
+pi = math.pi
+pi2 = 2*math.pi
+inf = math.huge
+
+function round(num, num_dec)
+	-- http://lua-users.org/wiki/SimpleRound
+	local mult = 10^(num_dec or 0)
+	return math.floor(num * mult + 0.5) / mult
+end
+
 function copy_table(tab)
 	local newtab = {}
 	for k,v in pairs(tab) do
@@ -19,6 +30,21 @@ function copy_table(tab)
 	end
 	return newtab
 end
+
+function table.clone(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in pairs(orig) do
+            copy[orig_key] = orig_value
+        end
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
 
 function is_between(v, a, b)
 	return a <= v and v <= b
@@ -82,7 +108,10 @@ function concat(...)
 	local args = {...}
 	local s = ""
 	for _,v in pairs(args) do
-		s = s..tostring(v)
+		local seg = tostring(v)
+		if v == nil then  seg = "nil"  end
+		if type(v) == table then   seg = table_to_str   end
+		s = s..seg
 	end
 	return s
 end
@@ -149,6 +178,10 @@ function split_str(inputstr, sep)
 	return t
 end
 
+function table_to_str(tab)
+	return "{"..concatsep(tab, ", ").."}"
+end
+
 function draw_rank_medal(rank, defcol, x, y)
 	--- Circle
 	local rank_col = get_rank_color(rank, defcol)
@@ -162,7 +195,7 @@ function draw_rank_medal(rank, defcol, x, y)
 	print_centered(e, x+32, y+12, 0, .75)
 end
 
-function tobool(str)
+function strtobool(str)
 	return str ~= "false" -- Anything other than "false" returns as true
 end
 
@@ -170,12 +203,35 @@ function random_neighbor(n)
 	return love.math.random()*2*n - n
 end
 
+
 function random_range(a,b)
 	return love.math.random()*(b-a) + a
 end
 
 function random_sample(t)
 	return t[love.math.random(1,#t)]
+end
+
+function random_weighted(li, rng)
+	local sum_w = 0
+	for _,e in pairs(li) do
+		sum_w = sum_w + e[2]
+	end
+
+	local rnd 
+	if rng then 
+		rnd = rng:random(0, sum_w-1)
+	else 
+		rnd = love.math.random(0, sum_w-1)
+	end
+	
+	for i=1, #li do
+		if rnd < li[i][2] then
+			return li[i][1]
+		end
+		rnd = rnd - li[i][2]
+	end
+	assert("Random_weighted out of range // Something has gone wrong and you definitely can't code!")
 end
 
 --[[
@@ -241,6 +297,18 @@ function print_color(col, text, x, y)
 	love.graphics.setColor(1,1,1,1)
 end
 
+function print_outline(col_in, col_out, text, x, y, r)
+	r=r or 1
+	for ix=-r, r do
+		for iy=-r, r do
+			if not (ix == 0 and iy == 0) then 
+				print_color(col_out, text, x+ix, y+iy)
+			end
+		end
+	end
+	print_color(col_in, text, x, y)
+end
+
 function exec_color(col, func, ...)
 	col = col or {1,1,1,1}
 	love.graphics.setColor(col)
@@ -252,6 +320,13 @@ function rect_color(col, mode, x, y, w, h, ...)
 	col = col or {1,1,1,1}
 	love.graphics.setColor(col)
 	love.graphics.rectangle(mode, floor(x)+0.5, floor(y)+0.5, floor(w), floor(h), ...)
+	love.graphics.setColor(1,1,1,1)
+end
+
+function line_color(col, ax, ay, bx, by, ...)
+	col = col or {1,1,1,1}
+	love.graphics.setColor(col)
+	love.graphics.line(floor(ax), floor(ay), floor(bx), floor(by), ...)
 	love.graphics.setColor(1,1,1,1)
 end
 
@@ -270,9 +345,46 @@ function sqr(a)
 end
 
 function distsqr(ax, ay, bx, by)
+	bx = bx or 0
+	by = by or 0
 	return sqr(bx - ax) + sqr(by - ay)
 end
 
 function dist(...)
 	return sqrt(distsqr(...))
+end
+
+function lerp(a,b,t) 
+	return a * (1-t) + b * t 
+end
+
+function wrap_to_pi(a)
+	return (a + math.pi) % (math.pi*2) - math.pi
+end
+
+function shortest_angle_dist(a, b)
+	local max = 2*math.pi
+	local diff = (b - a) % max
+	return (2*diff) % max - diff
+end
+
+function lerp_angle(a, b, t)
+	a = a % (math.pi*2)
+	return a + shortest_angle_dist(a, b)*t
+end
+
+function get_left_vec(x, y)
+	return y, -x
+end
+
+function get_right_vec(x, y)
+	return -y, x
+end
+
+function get_orthogonal(x, y, dir)
+	if dir == -1 then
+		return get_left_vec(x,y)
+	else
+		return get_right_vec(x, y)
+	end
 end

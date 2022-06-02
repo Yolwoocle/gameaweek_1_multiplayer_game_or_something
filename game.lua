@@ -26,12 +26,16 @@ function Game:init()
 	local map_h = self.map.height * BW
 	self.box_up = {name="box_up",     is_solid = true, x = -BW, y = -BW,      w=map_w + 2*BW, h=BW}
 	self.box_down = {name="box_down", is_solid = true, x = -BW, y = map_h, w=map_w + 2*BW, h=BW}
+	self.box_left = {name="box_left",   is_solid = true, x = -BW, y = 0,    w=BW,   h=map_h}
+	self.box_right = {name="box_right", is_solid = true, x = map_w, y = 0,  w=BW,   h=map_h}
 	collision:add(self.box_up)
 	collision:add(self.box_down)
+	collision:add(self.box_left)
+	collision:add(self.box_right)
 	
 	self.actors = {}
 	self:init_players()
-	self:new_actor(Enemies.Bug:new(64,64))
+	--self:new_actor(Enemies.Bug:new(64,64))
 
 	self.inventory = Inventory:new()
 
@@ -47,11 +51,13 @@ function Game:update(dt)
 		actor.debug_timer = 0
 	end
 
+	-- update
 	for k,actor in pairs(self.actors) do
 		if not actor.debug_timer then    actor.debug_timer = 0    end
 		actor.debug_timer = actor.debug_timer + 1
 		actor:update(dt)
 	end
+	self.inventory:update()
 
 	-- Delete actors
 	for i = #self.actors, 1, -1 do
@@ -69,6 +75,11 @@ function Game:update(dt)
 		self.world_generator.seed = self.world_generator.seed + 0.05
 		self.world_generator:generate(self.map)
 	end
+
+	if love.keyboard.isDown("y") then
+		self.map:reset()
+		self.world_generator:make_box()
+	end
 end
 
 function Game:draw()
@@ -79,6 +90,7 @@ function Game:draw()
 	for k,actor in pairs(self.actors) do
 		actor:draw()
 	end
+	self.inventory:draw()
 
 	if self.debug_mode then
 		self:draw_debug()
@@ -114,8 +126,8 @@ function Game:init_players()
 			right = {"d"},
 			up = {"w"},
 			down = {"s"},
-			jump = {"c"},
-			fire = {"v"},
+			mine = {"c"},
+			place = {"v"},
 		},
 		[2] = {
 			type = "keyboard",
@@ -123,8 +135,8 @@ function Game:init_players()
 			right = {"right"},
 			up = {"up"},
 			down = {"down"},
-			jump = {"."},
-			fire = {","},
+			mine = {"."},
+			place = {","},
 		}
 	}
 

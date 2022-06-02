@@ -22,5 +22,6 @@ images.magnet = load_image("magnet.png")
 images.ant = load_image("ant1.png")
 images.grass = load_image("grass.png")
 images.dirt = load_image("dirt.png")
+images.mushroom = load_image("mushroom.png")
 
 return images

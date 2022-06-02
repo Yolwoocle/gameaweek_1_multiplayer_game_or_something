@@ -48,7 +48,7 @@ end
 
 function love.update(dt)
 	t = t + dt
-	print("t:", t)
+	--print("t:", t)
 	local cap = 50
 	local i = 0
 	while t > fdt and cap > 0 do
@@ -57,7 +57,7 @@ function love.update(dt)
 		cap = cap - 1
 		i=i+1
 	end
-	print("nt:", t)
+	--print("nt:", t)
 end
 
 function love.draw()
@@ -123,7 +123,7 @@ function print(...)
 	
 	table.insert(msg_log, concatsep({...}, " "))
 
-	if #msg_log > 10 then
+	if #msg_log > 20 then
 		table.remove(msg_log, 1)
 	end
 end
@@ -131,7 +131,7 @@ end
 function draw_log()
 	-- log
 	local h = gfx.getFont():getHeight()
-	for i=1, min(#msg_log, 10) do
+	for i=1, min(#msg_log, 20) do
 		local imsg = i
 		local msg = msg_log[imsg]
 		local w = get_text_width(msg)

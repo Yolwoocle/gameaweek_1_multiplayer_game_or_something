@@ -17,12 +17,23 @@ function Player:init(n, x, y, controls)
 	self.controls = controls
 	self:init_last_input_state()
 
+	self.rot = 0
+	self.visual_rot = 0
 	self.mid_x = self.x + floor(self.w / 2)
 	self.mid_y = self.y + floor(self.h / 2)
 	self.move_dir_x = 1
 	
 	-- Speed 
-	self.speed = 50
+	self.speed = 100
+	self.gravity = 0
+	-- self.friction_x = 1
+	self.default_friction = 0.6
+	self.friction_x = self.default_friction
+	self.friction_y = self.default_friction
+
+	-- Climbing
+	self.up_vect = {x=0, y=-1}
+	self.is_grounded = false
 
 	-- Jump
 	self.jump_speed = 450
@@ -36,18 +47,10 @@ function Player:init(n, x, y, controls)
 	self.wall_slide_speed = 50
 	self.is_wall_sliding = false
 
-	self.wall_jump_margin = 8
-	self.wall_collision_box = { --Move this to a seperate class if needed
-		x = self.x,
-		y = self.y,
-		w = self.w + self.wall_jump_margin*2,
-		h = self.h,
-	}
-	collision:add(self.wall_collision_box)
-
 	-- Visuals
 	self.color = ({COL_RED, COL_GREEN, COL_CYAN, COL_YELLOW})[self.n]
 	self.color = self.color or COL_RED
+	self.flip_x = 1
 
 	-- Shooting & guns (keep it or ditch for family friendliness?)
 	self.gun = Guns.Machinegun:new()
@@ -58,44 +61,57 @@ function Player:init(n, x, y, controls)
 	self.cu_y = 0
 	self.mine_timer = 0
 	self.cu_target = nil
+	self.cu_range = 3
+	
+	-- Inventory
+	self.holding = nil
+	self.mine_mode = true
 
 	-- Debug 
 	self.dt = 1
 end
 
 function Player:update(dt)
-	print("the dt:", dt)
+	--print("the dt:", dt)
 	self.dt = dt
 
 	-- Movement
-	self:move(dt)
-	self:do_wall_sliding(dt)
-	self:do_jumping(dt)
-	self:do_gravity(dt)
+	self:do_movement(dt)
+	--self:do_jumping(dt)
 	self:update_actor(dt)
+	self:do_ledge_climbing(dt)
+	
+	self:do_conditional_gravity(dt)
+	self:do_gravity(dt)
+
 	self.mid_x = self.x + floor(self.w/2)
 	self.mid_y = self.y + floor(self.h/2)
-	
-	-- Gun
-	--self.gun:update(dt)
-	--self:shoot(dt)
+	self:compute_rotation()
 
 	-- Mine 
 	self:update_cursor(dt)
-	self:mine(dt)
+	if self.holding then
+		self:place(dt)
+	else
+		self:mine(dt)
+	end
 
 	self:update_button_state()
 end
 
 function Player:draw()
-	self:draw_actor(self.move_dir_x)
+	self:draw_actor(self.flip_x, 1, self.visual_rot)
 
 	-- Cursor
-	if self.cu_target then
+	if self.cu_target or true then
 		rect_color(COL_WHITE, "line", self.cu_x*BW, self.cu_y*BW, BLOCK_WIDTH, BLOCK_WIDTH)
 	end
 
-	if self.cu_target and self.mine_timer>0 then
+	if self.holding then
+		gfx.draw(self.holding.sprite, self.x-8, self.y-8)
+	end
+
+	if self.cu_target and self.mine_timer > 0 then
 		local ratio = self.mine_timer / self.cu_target.mine_time
 		local w = 16
 
@@ -103,152 +119,163 @@ function Player:draw()
 		rect_color(COL_WHITE, "fill", self.cu_x*w, self.cu_y*w - 8, ratio*w, 4)
 	end
 
-	print_color(COL_WHITE, concat("P", self.n), self.x, self.y-24)
+	print_outline(self.color, COL_WHITE, concat("P", self.n), self.x, self.y-16*2)
 	if game.debug_mode then
+		line_color(COL_RED, self.mid_x, self.mid_y, self.mid_x + self.up_vect.x*16, self.mid_y + self.up_vect.y*16)
 	end
 end
 
-function Player:move(dt)
+function Player:do_movement(dt)
+	--if self.wall_col then print("wall_col ", self.wall_col.normal.x, self.wall_col.normal.y)  end
+
 	-- compute movement dir
 	local dir = {x=0, y=0}
 	if self:button_down('left') then   dir.x = dir.x - 1   end
 	if self:button_down('right') then   dir.x = dir.x + 1   end
 
-	if dir.x ~= 0 then
-		self.move_dir_x = dir.x
-
-		-- If not shooting, update shooting direction
-		if not self.is_shooting then
-			self.shoot_dir_x = dir.x
-		end
+	-- Movement vector corresponds to up vect rotated accordly
+	local move_vect = {x=0, y=0}
+	if dir.x == -1 then   
+		self.flip_x = -1
+		move_vect.x = self.up_vect.y
+		move_vect.y = -self.up_vect.x
+	end 
+	if dir.x == 1  then
+		self.flip_x = 1
+		move_vect.x = -self.up_vect.y
+		move_vect.y = self.up_vect.x
 	end
-
+	
 	-- Apply velocity 
-	self.vx = self.vx + dir.x * self.speed
-	self.vy = self.vy + dir.y * self.speed
+	self.vx = self.vx + move_vect.x * self.speed
+	self.vy = self.vy + move_vect.y * self.speed
 end
 
-function Player:do_wall_sliding(dt)
-	-- Check if wall sliding
-	self.is_wall_sliding = false
-	self.is_walled = false
-	if self.wall_col then
-		local col_normal = self.wall_col.normal
-		local is_walled = (col_normal.y == 0)
-		local is_falling = (self.vy > 0)
-		local holding_left = self:button_down('left') and col_normal.x == 1
-		local holding_right = self:button_down('right') and col_normal.x == -1
-		
-		local is_wall_sliding = is_walled and is_falling and (holding_left or holding_right)
-		self.is_wall_sliding = is_wall_sliding
-		self.is_walled = is_walled
+-- On collision, climb
+function Player:on_collision(col)
+	if not col.other.is_solid then   return    end
+	--if not self.is_sticky then    return    end
+	
+	local col_normal = col.normal
+	local dot = col_normal.x * self.up_vect.x + col_normal.y * self.up_vect.y
+
+	-- if vectors are opposite, then is grounded
+	if dot <= -1 then
+		self.is_grounded = true
 	end
 
-	-- Perform wall sliding
-	if self.is_wall_sliding then
+	-- React to wall climbing
+	if dot ~= 0 then   return   end -- Vectors are not orthogonal (perpendicular)
+	
+	local up_ang = atan2(self.up_vect.y, self.up_vect.x) 
+	local normal_ang = atan2(col_normal.y, col_normal.x) 
+	local diff = (normal_ang - up_ang) % pi2
+	if diff < pi then
+		self.vx, self.vy = -self.vy, self.vx
+	else
+		self.vx, self.vy = self.vy, -self.vx
+	end
+
+	-- Set "up" to collision vector
+	self.up_vect = col_normal 
+end
+
+function Player:do_ledge_climbing(dt)
+	--if not self.is_sticky then    return    end
+	-- Snap to walls if "falling off" ledge
+
+	-- Check if grounded given current orientation
+	local old_grounded = self.is_grounded
+
+	local ground_offset = 8
+	local goal_x = self.x - self.up_vect.x*ground_offset
+	local goal_y = self.y - self.up_vect.y*ground_offset
+
+	local actual_x, actual_y, cols, len = collision:check(self, goal_x, goal_y)
+	local is_col = false
+	for _,col in pairs(cols) do
+		if col.other.is_solid then
+			-- The player is grounded, so snap it nearest wall
+			is_col = true
+			if self.is_sticky then   self:move_to(goal_x, goal_y)  end
+		end
+	end
+	
+	self.is_grounded = is_col
+
+	-- Move around ledge
+	if old_grounded and not is_col then
+		-- Round movement vector to nearest cardinal direction
+		local move_ang = atan2(self.vy, self.vx)
+		move_ang = floor(4 * move_ang/pi2)
+		move_ang = pi2 * (move_ang / 4)
+		-- Normalisze movement vector
+		local move_x = round(cos(move_ang)) 
+		local move_y = round(sin(move_ang))
+		local move_vect = {x = move_x, y = move_y}
+
+		-- Compare up vector and movement vector
+		--- This will define around which way the player is turning in a corner 
+		local up_ang = atan2(self.up_vect.y, self.up_vect.x)
+		local diff = (move_ang - up_ang) % pi2 
+		
+		if diff < pi then
+			-- Right turn
+			--   +- - - - >
+			--   :  +-----
+			--   :  |
+			self.vx, self.vy = -self.vy, self.vx 
+		else
+			-- Left turn
+			--  < - - - +
+			--  ------+ : 
+			--        | :
+			self.vx, self.vy = self.vy, -self.vx
+		end
+
+		-- Set "up" to the movement direction
+		self.up_vect = move_vect
+	end
+end
+
+function Player:compute_rotation()
+	local rot = atan2(self.up_vect.y, self.up_vect.x) + pi/2
+	self.rot = rot 
+
+	local spr_w2 = floor(self.sprite:getWidth() / 2)
+	local spr_h2 = floor(self.sprite:getHeight() / 2)
+
+	local x = self.x + spr_w2 - self.spr_ox
+	local y = self.y + spr_h2 - self.spr_oy
+	if self.sprite then
+		gfx.draw(self.sprite, x, y, rot, fx, fy, spr_w2, spr_h2)
+	end
+
+	self.rot = wrap_to_pi(self.rot)
+	
+	-- Lerp rotation
+	local epsilon = 0.01
+	if abs(self.visual_rot - self.rot) > epsilon then
+		self.visual_rot = lerp_angle(self.visual_rot, self.rot, 0.4)
+	else 
+		self.visual_rot = self.rot
+	end
+end
+
+function Player:do_conditional_gravity(dt)
+	local is_walled = self.wall_col or self.is_grounded
+	if not is_walled then --or self:button_down("jump") then
+		self.is_sticky = false
+	else
+		self.is_sticky = true
+	end
+
+	if self.is_sticky then
 		self.gravity = 0
-		self.vy = self.wall_slide_speed
+		self.friction_y = self.default_friction
 	else
 		self.gravity = self.default_gravity
-	end
-
-	-- Orient player opposite if wall sliding
-	if self.is_wall_sliding then
-		self.move_dir_x = self.wall_col.normal.x
-		self.shoot_dir_x = self.wall_col.normal.x
-	end
-end
-
-function Player:do_jumping(dt)
-	local do_jump = false
-
-	-- This buffer is so that you still jump even if you're a few frames behind
-	self.buffer_jump_timer = self.buffer_jump_timer - 1
-	if self:button_pressed('jump') then
-		self.buffer_jump_timer = 6
-	end
-
-	-- Coyote time
-	--FIXME: if you press jump really fast, you can exploit coyote time and double jump 
-	self.coyote_time = self.coyote_time - 1
-	
-	if self.buffer_jump_timer > 0 then
-		-- Detect nearby walls using a collision box
-		local wall_normal = self:get_nearby_wall()
-
-		if self.is_grounded or self.coyote_time > 0 then 
-			-- Regular jump
-			self:jump(dt)
-			self:on_jump()
-
-		elseif wall_normal then
-			-- Conditions for a wall jump ("wall kick")
-			local left_jump  = (wall_normal.x == 1) and self:button_down("right")
-			local right_jump = (wall_normal.x == -1) and self:button_down("left")
-
-			-- Conditions for a wall jump used for climbing, while sliding ("wall climb")
-			local wall_climb = self.is_wall_sliding
-
-			if left_jump or right_jump or wall_climb then
-				self:wall_jump(wall_normal)
-			end
-			self:on_jump()
-		end
-	end
-end
-
-function Player:get_nearby_wall()
-	-- Returns whether the player is near a wall on its side
-	-- This does not count floor and ceilings
-	local null_filter = function()
-		return "cross"
-	end
-	
-	local box = self.wall_collision_box
-	box.x = self.x - self.wall_jump_margin
-	box.y = self.y - self.wall_jump_margin
-	box.w = self.w + self.wall_jump_margin*2
-	box.h = self.h + self.wall_jump_margin*2
-	collision:update(box)
-	
-	local x,y, cols, len = collision:move(box, box.x, box.y, null_filter)
-	for _,col in pairs(cols) do
-		if col.other.is_solid and col.normal.y == 0 then 
-			return col.normal	
-		end
-	end
-
-	return false
-end
-
-function Player:jump(dt)
-	self.vy = -self.jump_speed
-end
-
-function Player:wall_jump(normal)
-	self.vx = normal.x * self.wall_jump_kick_speed
-	self.vy = -self.jump_speed
-end
-
-function Player:on_jump()
-	self.buffer_jump_timer = 0
-	self.coyote_time = 0
-end
-
-function Player:on_leaving_ground()
-	self.coyote_time = self.default_coyote_time
-end
-
-function Player:on_leaving_collision()
-	self.coyote_time = self.default_coyote_time
-end
-
-function Player:shoot(dt)
-	if self:button_down("fire") then
-		self.is_shooting = true
-		self.gun:shoot(dt, self, self.x+8, self.y+8, self.shoot_dir_x, 0)
-	else
-		self.is_shooting = false
+		self.friction_y = 1
 	end
 end
 
@@ -294,19 +321,7 @@ function Player:update_cursor(dt)
 
 	local tx = floor(self.mid_x / BLOCK_WIDTH) 
 	local ty = floor(self.mid_y / BLOCK_WIDTH) 
-	local dx, dy = 0, 0
-
-	-- Target up and down 
-	local btn_up = self:button_down("up")
-	local btn_down = self:button_down("down")
-	if btn_up or btn_down then
-		dx = 0
-		if btn_up then    dy = -1    end
-		if btn_down then  dy = 1     end
-	else
-		-- By default, target sideways
-		dx = self.move_dir_x
-	end
+	local dx, dy = self:target_nearest_tile(tx, ty, self.holding)
 
 	-- Update target position
 	self.cu_x = tx + dx
@@ -315,7 +330,7 @@ function Player:update_cursor(dt)
 	-- Update target tile
 	local target_tile = game.map:get_tile(self.cu_x, self.cu_y)
 	self.cu_target = nil
-	if target_tile and target_tile.is_solid then
+	if target_tile then
 		self.cu_target = target_tile
 	end
 	
@@ -325,19 +340,83 @@ function Player:update_cursor(dt)
 	end
 end
 
+function Player:target_nearest_tile(tx, ty, target_air)
+	local dx, dy = 0, 0
+
+	-- Target up and down 
+	-- fix: this is messy af
+	local btn_up = self:button_down("up")
+	local btn_down = self:button_down("down")
+	if btn_up or btn_down then
+		dx, dy = 0, 0
+		if self:button_down("left") or self:button_down("right") then  
+			dx, dy = get_orthogonal(self.up_vect.x, self.up_vect.y, self.flip_x)  
+		end
+		if btn_up then
+			dx = dx + self.up_vect.x    
+			dy = dy + self.up_vect.y    
+		end
+		if btn_down then 
+			dx = dx - self.up_vect.x    
+			dy = dy - self.up_vect.y 
+		end
+	else
+		-- By default, target sideways
+		-- Find block within range 
+		local side_x, side_y = get_orthogonal(self.up_vect.x, self.up_vect.y, self.flip_x)
+		local mult = nil
+		for i=0, self.cu_range do
+			local target = game.map:get_tile(tx + side_x*i, ty + side_y*i)
+			if target and target.is_targetable then
+				mult = i
+				break
+			end
+		end
+
+		-- if targeting air
+		if mult and target_air then    mult = max(0, mult-1)   end
+		mult = mult or 1
+		dx, dy = side_x*mult, side_y*mult
+	end
+
+	return dx, dy
+end
+
+function Player:target_nearest_air(tx, ty)
+
+end
+
 function Player:mine(dt)
 	if not self.cu_target then   return    end
+	if not self.cu_target.is_breakable then   return    end
 	
-	if self:button_down("fire") then
+	if self:button_down("mine") then
+		-- Augment mine timer
 		self.mine_timer = self.mine_timer + dt
-
+		
+		-- If mine timer at max
 		if self.mine_timer > self.cu_target.mine_time then
 			local drop = self.cu_target.drop
 			game.map:set_tile(self.cu_x, self.cu_y, 0)
-			--game.inventory:add_item(drop)
+			local success = game.inventory:add(drop, 1)
+			self.holding = drop
 		end
 	else
+		-- Reset if not holding mine button
 		self.mine_timer = 0
+	end
+end
+
+function Player:place()
+	if not self.holding then    return print("Player.place called while no item carried")    end
+	if not self:button_pressed("mine") then    return    end
+	
+	-- If target is air, place blocks
+	if self.cu_target and self.cu_target.id == 0 then
+		local success = game.map:set_tile(self.cu_x, self.cu_y, self.holding.id)
+		self.holding = nil
+		if success then
+		end
 	end
 end
 
